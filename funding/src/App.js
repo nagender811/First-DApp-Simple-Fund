@@ -1,31 +1,74 @@
 import { useEffect, useState } from "react";
 import Web3 from "web3";
+import detectEthereumProvider from "@metamask/detect-provider";
+import { loadContract } from "./utils/load-contract";
 
 function App() {
-  const [web3Api, setWeb3Api] = useState({ web3Api: null, provider: null });
+  const [web3Api, setWeb3Api] = useState({
+    web3Api: null,
+    provider: null,
+    contract: null,
+  });
 
   const [account, setAccount] = useState(null);
+  const [balance, setBalance] = useState(null);
+  const [reload, shouldReload] = useState(false);
+
+  const reloadEffect = () => shouldReload(!reload);
+
   useEffect(() => {
     const loadProvider = async () => {
-      let provider = null;
-      if (window.ethereum) {
-        provider = window.ethereum;
-        try {
-          await provider.enable();
-        } catch {
-          console.error("User is not allowed");
-        }
-      } else if (window.web3) {
-        provider = window.web3.currentProvider;
-      } else if (!process.env.production) {
-        provider = new Web3.providers.HttpProvider("http://localhost:7545");
+      const provider = await detectEthereumProvider();
+      const contract = await loadContract("Funder", provider);
+      if (provider) {
+        provider.request({ method: "eth_requestAccounts" });
+        setWeb3Api({ web3: new Web3(provider), provider, contract });
+      } else {
+        console.error("Please install MetaMask!");
       }
+
+      // if (window.ethereum) {
+      //   provider = window.ethereum;
+      //   try {
+      //     await provider.enable();
+      //   } catch {
+      //     console.error("User is not allowed");
+      //   }
+      // } else if (window.web3) {
+      //   provider = window.web3.currentProvider;
+      // } else if (!process.env.production) {
+      //   provider = new Web3.providers.HttpProvider("http://localhost:7545");
+      // }
       // console.log(window.web3);
       // console.log(window.ethereum);
-      setWeb3Api({ web3: new Web3(provider), provider });
     };
     loadProvider();
   }, []);
+
+  useEffect(() => {
+    const loadBalance = async () => {
+      const { contract, web3 } = web3Api;
+      const balance = await web3.eth.getBalance(contract.address);
+      setBalance(web3.utils.fromWei(balance, "ether"));
+    };
+    web3Api.contract && loadBalance();
+  }, [web3Api, reload]);
+
+  const TransferFund = async () => {
+    const { web3, contract } = web3Api;
+    await contract.transfer({
+      from: account,
+      value: web3.utils.toWei("2", "ether"),
+    });
+    reloadEffect();
+  };
+
+  const withdrawFund = async () => {
+    const { contract, web3 } = web3Api;
+    const withdrawAmount = web3.utils.toWei("2", "ether");
+    await contract.withdraw(withdrawAmount, { from: account });
+    reloadEffect();
+  };
 
   useEffect(() => {
     const getAccount = async () => {
@@ -42,8 +85,10 @@ function App() {
       <div class="card text-center">
         <div class="card-header">Funding</div>
         <div class="card-body">
-          <h5 class="card-title">Balance: 20 ETH </h5>
-          <p class="card-text">Account: {account ? account : "Not Connected"}</p>
+          <h5 class="card-title">Balance: {balance}</h5>
+          <p class="card-text">
+            Account: {account ? account : "Not Connected"}
+          </p>
           {/* <button
             type="button"
             class="btn btn-success"
@@ -57,11 +102,11 @@ function App() {
             Connect to metamask
           </button> */}
           &nbsp;
-          <button type="button" class="btn btn-success ">
+          <button type="button" class="btn btn-success " onClick={TransferFund}>
             Transfer
           </button>
           &nbsp;
-          <button type="button" class="btn btn-primary ">
+          <button type="button" class="btn btn-primary " onClick={withdrawFund}>
             Withdraw
           </button>
         </div>
