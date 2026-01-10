@@ -1,18 +1,28 @@
 // SPDX-License-Identifier: MIT
-pragma solidity >= 0.5.0 < 0.9.0;
+pragma solidity >=0.4.22 <0.9.0;
 
 contract Funder {
-    uint public numOfFunders;
+    uint256 public numOfFunders;
 
-    mapping(uint => address) private funders;
+    mapping(uint256 => address) private funders;
 
-    recieve() external payable {}
-    
-    function transfer() external payable{
-        funders[numOfFunders]= msg.sender;
-    }
-    function withdraw(uint withdrawAmount) external {
-        require(withdrawAmount <= 2000000000000000000, "Cannot withdraw greater than 2 Ether");
-        payable(msg.sender).transfer(withdrawAmount); 
+    receive() external payable {}
+
+   function fund() external payable {
+    funders[numOfFunders] = msg.sender;
+    numOfFunders++;
+}
+
+
+    function withdraw(uint256 withdrawAmount) external {
+        require(
+            withdrawAmount <= 2000000000000000000,
+            "Cannot withdraw more than 2 ether"
+        );
+         require(
+            address(this).balance >= withdrawAmount,
+            "Insufficient contract balance"
+        );
+        payable(msg.sender).transfer(withdrawAmount);
     }
 }
